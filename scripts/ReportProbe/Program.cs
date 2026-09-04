@@ -1,0 +1,10 @@
+using Npgsql;
+using QuestPDF.Infrastructure;
+using SistemaPrestamos.Api.Services;
+QuestPDF.Settings.License=LicenseType.Community;
+var cs=Environment.GetEnvironmentVariable("PROBE_CONNECTION")??throw new Exception("Missing connection");
+var output=Environment.GetEnvironmentVariable("REPORT_OUTPUT")??Directory.GetCurrentDirectory();
+await using var source=NpgsqlDataSource.Create(cs);var repo=new ReporteRepository(source);var service=new ReportePdfService(repo);var cartera=await repo.CarteraAsync();
+await File.WriteAllBytesAsync(Path.Combine(output,"cartera-general.pdf"),await service.CarteraAsync());
+var clienteId=cartera.Prestamos.First().ClienteId;await File.WriteAllBytesAsync(Path.Combine(output,"estado-cuenta-cliente.pdf"),await service.EstadoCuentaAsync(clienteId));
+Console.WriteLine($"CLIENTE={clienteId}; PRESTAMOS={cartera.Prestamos.Count}");

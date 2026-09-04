@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/appsettings.Development.json
+frontend/node_modules/
+frontend/dist/
+.env
+scripts/*.dump
+scripts/backups/
+scripts/logs/
+scripts/build-check/
+scripts/LoanProbe/bin/
+scripts/LoanProbe/obj/
+scripts/ReceiptProbe/bin/
+scripts/ReceiptProbe/obj/
+backend/SistemaPrestamos.Api/storage/
