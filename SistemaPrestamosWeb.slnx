@@ -1,6 +1,5 @@
 <Solution>
   <Folder Name="/backend/">
     <Project Path="backend/SistemaPrestamos.Api/SistemaPrestamos.Api.csproj" />
-    <Project Path="backend/SistemaPrestamos.Domain/SistemaPrestamos.Domain.csproj" />
   </Folder>
 </Solution>
