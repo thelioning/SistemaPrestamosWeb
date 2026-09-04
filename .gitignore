@@ -19,3 +19,4 @@ backend/SistemaPrestamos.Api/storage/
 # Artefactos generados y temporales
 output/
 tmp/
+scripts/build-check/
