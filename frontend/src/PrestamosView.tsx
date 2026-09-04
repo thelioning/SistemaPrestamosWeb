@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import "./PrestamosView.css";
 import "./Reenganche.css";
@@ -89,13 +89,17 @@ export default function PrestamosView({
   const [frecuenciaNueva, setFrecuenciaNueva] = useState("SEMANAL"),
     [cuotaNueva, setCuotaNueva] = useState(0),
     [periodosNuevos, setPeriodosNuevos] = useState(13);
-  const cargar = () =>
-    request("/api/prestamos", token)
-      .then(setItems)
-      .catch((e) => setError(e.message));
+  const cargar = useCallback(
+    () =>
+      request("/api/prestamos", token)
+        .then(setItems)
+        .catch((e) => setError(e.message)),
+    [token],
+  );
+
   useEffect(() => {
     void cargar();
-  }, [token]);
+  }, [cargar]);
   useEffect(() => {
     if (modal)
       request("/api/prestamos/reenganches/elegibles", token)

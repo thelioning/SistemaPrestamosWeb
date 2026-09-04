@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react'
+import {useCallback,useEffect,useMemo,useState} from 'react'
 import type{FormEvent}from'react'
 import'./PagosView.css'
 import'./Recibos.css'
@@ -14,10 +14,45 @@ const money=(v=0)=>new Intl.NumberFormat('es-DO',{style:'currency',currency:'DOP
 async function req(path:string,token:string,options:RequestInit={}){const r=await fetch(`${API}${path}`,{...options,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).message??'No fue posible completar la solicitud.');return r.json()}
 export default function PagosView({token,onChanged}:{token:string;onChanged:()=>void}){
  const[loans,setLoans]=useState<Loan[]>([]),[payments,setPayments]=useState<Payment[]>([]),[clients,setClients]=useState<ReceiptClient[]>([]),[receipts,setReceipts]=useState<Receipt[]>([]),[archive,setArchive]=useState<ReceiptClient|null>(null),[clientSearch,setClientSearch]=useState(''),[receiptSearch,setReceiptSearch]=useState(''),[receiptType,setReceiptType]=useState('TODOS'),[receiptState,setReceiptState]=useState('TODOS'),[receiptLoan,setReceiptLoan]=useState('TODOS'),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState(''),[annulReceipt,setAnnulReceipt]=useState<Receipt|null>(null),[annulReason,setAnnulReason]=useState(''),[annulling,setAnnulling]=useState(false),[installments,setInstallments]=useState<Installment[]>([]),[modal,setModal]=useState(false),[loanId,setLoanId]=useState(0),[kind,setKind]=useState(''),[installment,setInstallment]=useState(0),[amount,setAmount]=useState(0),[interest,setInterest]=useState(0),[capital,setCapital]=useState(0),[error,setError]=useState(''),[saving,setSaving]=useState(false),[done,setDone]=useState<Confirmation|null>(null)
- const load=()=>Promise.all([req('/api/pagos/prestamos',token),req('/api/pagos',token),req('/api/recibos/clientes',token)]).then(([l,p,c])=>{setLoans(l);setPayments(p);setClients(c)}).catch(e=>setError(e.message))
- useEffect(()=>{void load()},[token]);const selected=loans.find(l=>l.id===loanId)
- useEffect(()=>{setKind(selected?.tipo==='SAN'?'CUOTA_SAN':selected?'REDITO':'');setInstallment(0);setAmount(0);if(selected?.tipo==='SAN')req(`/api/pagos/prestamos/${selected.id}/cuotas`,token).then(setInstallments).catch(e=>setError(e.message));else setInstallments([])},[loanId])
- const quota=installments.find(c=>c.numero===installment);useEffect(()=>{if(quota)setAmount(quota.pendiente)},[installment])
+ const load=useCallback(
+  ()=>Promise.all([
+   req('/api/pagos/prestamos',token),
+   req('/api/pagos',token),
+   req('/api/recibos/clientes',token)
+  ]).then(([l,p,c])=>{
+   setLoans(l)
+   setPayments(p)
+   setClients(c)
+  }).catch(e=>setError(e.message)),
+  [token]
+ )
+
+ useEffect(()=>{void load()},[load])
+
+ const selected=loans.find(l=>l.id===loanId)
+ const selectedId=selected?.id
+ const selectedTipo=selected?.tipo
+
+ useEffect(()=>{
+  setKind(selectedTipo==='SAN'?'CUOTA_SAN':selectedId?'REDITO':'')
+  setInstallment(0)
+  setAmount(0)
+
+  if(selectedTipo==='SAN'&&selectedId){
+   req(`/api/pagos/prestamos/${selectedId}/cuotas`,token)
+    .then(setInstallments)
+    .catch(e=>setError(e.message))
+  }else{
+   setInstallments([])
+  }
+ },[selectedId,selectedTipo,token])
+
+ const quota=installments.find(c=>c.numero===installment)
+ const cuotaPendiente=quota?.pendiente
+
+ useEffect(()=>{
+  if(cuotaPendiente!==undefined)setAmount(cuotaPendiente)
+ },[cuotaPendiente])
  const total=kind==='MIXTO'?interest+capital:amount;const today=payments.filter(p=>p.estado==='APLICADO'&&p.fecha===new Date().toISOString().slice(0,10)).reduce((a,p)=>a+p.monto,0)
  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setSaving(true);setError('');const f=new FormData(e.currentTarget);const body={prestamoId:loanId,tipoPago:kind,numeroCuota:kind==='CUOTA_SAN'?installment:null,monto:kind==='MIXTO'?null:amount,montoRedito:kind==='MIXTO'?interest:null,montoCapital:kind==='MIXTO'?capital:null,fecha:f.get('fecha'),observacion:f.get('observacion')};try{setDone(await req('/api/pagos',token,{method:'POST',body:JSON.stringify(body)}));await load();onChanged()}catch(x){setError((x as Error).message)}finally{setSaving(false)}}
  function close(){setModal(false);setDone(null);setLoanId(0);setAmount(0);setInterest(0);setCapital(0)}

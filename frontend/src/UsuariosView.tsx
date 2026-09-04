@@ -1,3 +1,358 @@
-import{useEffect,useState}from'react';import type{FormEvent}from'react';import'./UsuariosView.css'
-const API=import.meta.env.VITE_API_URL??'http://localhost:5159';type User={id:number;nombre:string;usuario:string;rol:string;estado:string;fechaRegistro:string;ultimoAcceso?:string};async function req(path:string,token:string,options:RequestInit={}){const r=await fetch(`${API}${path}`,{...options,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).message??'No fue posible completar la solicitud.');return r.status===204?null:r.json()}
-export default function UsuariosView({token,currentId}:{token:string;currentId:number}){const[users,setUsers]=useState<User[]>([]),[modal,setModal]=useState<'new'|'edit'|'password'|null>(null),[selected,setSelected]=useState<User|null>(null),[error,setError]=useState(''),[saving,setSaving]=useState(false);const load=()=>req('/api/usuarios',token).then(setUsers).catch(e=>setError(e.message));useEffect(()=>{void load()},[token]);function open(mode:'edit'|'password',u:User){setSelected(u);setModal(mode)}async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setSaving(true);setError('');const f=new FormData(e.currentTarget);try{if(modal==='new')await req('/api/usuarios',token,{method:'POST',body:JSON.stringify({nombre:f.get('nombre'),usuario:f.get('usuario'),clave:f.get('clave'),rol:f.get('rol')})});else if(modal==='edit')await req(`/api/usuarios/${selected!.id}`,token,{method:'PUT',body:JSON.stringify({nombre:f.get('nombre'),rol:f.get('rol'),estado:f.get('estado')})});else await req(`/api/usuarios/${selected!.id}/clave`,token,{method:'POST',body:JSON.stringify({clave:f.get('clave')})});setModal(null);setSelected(null);await load()}catch(e){setError((e as Error).message)}finally{setSaving(false)}}return <section className="users-page">{error&&<div className="inline-error">{error}<button onClick={()=>setError('')}>×</button></div>}<div className="users-intro"><div><p className="eyebrow">SEGURIDAD Y ACCESO</p><h2>Usuarios del sistema</h2><p>Asigne únicamente los permisos necesarios para el trabajo de cada persona.</p></div><button onClick={()=>{setSelected(null);setModal('new')}}>＋ Nuevo usuario</button></div><div className="role-guide"><article><span className="role-icon admin">A</span><div><b>Administrador</b><p>Control completo, usuarios, anulaciones y cierre de caja.</p></div></article><article><span className="role-icon collector">C</span><div><b>Cobrador</b><p>Registra clientes, préstamos y pagos.</p></div></article><article><span className="role-icon viewer">L</span><div><b>Consulta</b><p>Visualiza cartera, recibos y reportes sin modificar datos.</p></div></article></div><section className="users-card"><div className="users-card-head"><div><span>CUENTAS REGISTRADAS</span><h3>{users.length} usuarios</h3></div><small>{users.filter(u=>u.estado==='ACTIVO').length} activos</small></div><div className="table-wrap"><table><thead><tr><th>Persona</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th/></tr></thead><tbody>{users.map(u=><tr key={u.id}><td><div className="user-person"><span>{u.nombre.split(' ').slice(0,2).map(x=>x[0]).join('').toUpperCase()}</span><div><b>{u.nombre}</b>{u.id===currentId&&<small>Tu cuenta</small>}</div></div></td><td className="muted">@{u.usuario}</td><td><span className={`user-role ${u.rol.toLowerCase()}`}>{u.rol}</span></td><td><span className={`user-state ${u.estado.toLowerCase()}`}>● {u.estado}</span></td><td className="muted">{u.ultimoAcceso?new Date(u.ultimoAcceso).toLocaleString('es-DO'):'Nunca'}</td><td><div className="user-actions"><button onClick={()=>open('edit',u)}>Editar</button><button onClick={()=>open('password',u)}>Clave</button></div></td></tr>)}</tbody></table></div></section>{modal&&<div className="modal-backdrop" onMouseDown={()=>setModal(null)}><form className="user-modal" onSubmit={submit} onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><div><span>{modal==='new'?'NUEVA CUENTA':modal==='edit'?'PERMISOS Y ESTADO':'SEGURIDAD'}</span><h2>{modal==='new'?'Crear usuario':modal==='edit'?selected!.nombre:'Restablecer contraseña'}</h2></div><button type="button" className="close-button" onClick={()=>setModal(null)}>×</button></div>{modal==='password'?<><p className="form-help">La persona deberá utilizar esta nueva contraseña en su próximo acceso.</p><label>Nueva contraseña<input name="clave" type="password" minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" required autoFocus/></label></>:<><label>Nombre completo<input name="nombre" defaultValue={selected?.nombre} maxLength={80} required autoFocus/></label>{modal==='new'&&<label>Nombre de usuario<input name="usuario" maxLength={40} autoComplete="off" required/></label>}<label>Rol<select name="rol" defaultValue={selected?.rol??'COBRADOR'}><option value="ADMIN">Administrador</option><option value="COBRADOR">Cobrador</option><option value="CONSULTA">Solo consulta</option></select></label>{modal==='new'?<label>Contraseña inicial<input name="clave" type="password" minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" required/></label>:<label>Estado<select name="estado" defaultValue={selected?.estado}><option value="ACTIVO">Activo</option><option value="INACTIVO">Inactivo</option></select></label>}</>}<div className="modal-actions"><button type="button" className="cancel-button" onClick={()=>setModal(null)}>Cancelar</button><button disabled={saving}>{saving?'Guardando…':'Guardar cambios'}</button></div></form></div>}</section>}
+import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import './UsuariosView.css'
+
+const API = import.meta.env.VITE_API_URL ?? 'http://localhost:5159'
+
+type User = {
+  id: number
+  nombre: string
+  usuario: string
+  rol: string
+  estado: string
+  fechaRegistro: string
+  ultimoAcceso?: string
+}
+
+async function req(
+  path: string,
+  token: string,
+  options: RequestInit = {},
+) {
+  const r = await fetch(`${API}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!r.ok) {
+    throw new Error(
+      (await r.json().catch(() => ({}))).message ??
+        'No fue posible completar la solicitud.',
+    )
+  }
+
+  return r.status === 204 ? null : r.json()
+}
+
+export default function UsuariosView({
+  token,
+  currentId,
+}: {
+  token: string
+  currentId: number
+}) {
+  const [users, setUsers] = useState<User[]>([])
+  const [modal, setModal] = useState<'new' | 'edit' | 'password' | null>(null)
+  const [selected, setSelected] = useState<User | null>(null)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(
+    () =>
+      req('/api/usuarios', token)
+        .then(setUsers)
+        .catch((e) => setError(e.message)),
+    [token],
+  )
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  function open(mode: 'edit' | 'password', u: User) {
+    setSelected(u)
+    setModal(mode)
+  }
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+
+    const f = new FormData(e.currentTarget)
+
+    try {
+      if (modal === 'new') {
+        await req('/api/usuarios', token, {
+          method: 'POST',
+          body: JSON.stringify({
+            nombre: f.get('nombre'),
+            usuario: f.get('usuario'),
+            clave: f.get('clave'),
+            rol: f.get('rol'),
+          }),
+        })
+      } else if (modal === 'edit') {
+        await req(`/api/usuarios/${selected!.id}`, token, {
+          method: 'PUT',
+          body: JSON.stringify({
+            nombre: f.get('nombre'),
+            rol: f.get('rol'),
+            estado: f.get('estado'),
+          }),
+        })
+      } else {
+        await req(`/api/usuarios/${selected!.id}/clave`, token, {
+          method: 'POST',
+          body: JSON.stringify({ clave: f.get('clave') }),
+        })
+      }
+
+      setModal(null)
+      setSelected(null)
+      await load()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="users-page">
+      {error && (
+        <div className="inline-error">
+          {error}
+          <button onClick={() => setError('')}>×</button>
+        </div>
+      )}
+
+      <div className="users-intro">
+        <div>
+          <p className="eyebrow">SEGURIDAD Y ACCESO</p>
+          <h2>Usuarios del sistema</h2>
+          <p>Asigne únicamente los permisos necesarios para el trabajo de cada persona.</p>
+        </div>
+        <button
+          onClick={() => {
+            setSelected(null)
+            setModal('new')
+          }}
+        >
+          ＋ Nuevo usuario
+        </button>
+      </div>
+
+      <div className="role-guide">
+        <article>
+          <span className="role-icon admin">A</span>
+          <div>
+            <b>Administrador</b>
+            <p>Control completo, usuarios, anulaciones y cierre de caja.</p>
+          </div>
+        </article>
+        <article>
+          <span className="role-icon collector">C</span>
+          <div>
+            <b>Cobrador</b>
+            <p>Registra clientes, préstamos y pagos.</p>
+          </div>
+        </article>
+        <article>
+          <span className="role-icon viewer">L</span>
+          <div>
+            <b>Consulta</b>
+            <p>Visualiza cartera, recibos y reportes sin modificar datos.</p>
+          </div>
+        </article>
+      </div>
+
+      <section className="users-card">
+        <div className="users-card-head">
+          <div>
+            <span>CUENTAS REGISTRADAS</span>
+            <h3>{users.length} usuarios</h3>
+          </div>
+          <small>{users.filter((u) => u.estado === 'ACTIVO').length} activos</small>
+        </div>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Último acceso</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <div className="user-person">
+                      <span>
+                        {u.nombre
+                          .split(' ')
+                          .slice(0, 2)
+                          .map((x) => x[0])
+                          .join('')
+                          .toUpperCase()}
+                      </span>
+                      <div>
+                        <b>{u.nombre}</b>
+                        {u.id === currentId && <small>Tu cuenta</small>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="muted">@{u.usuario}</td>
+                  <td>
+                    <span className={`user-role ${u.rol.toLowerCase()}`}>
+                      {u.rol}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`user-state ${u.estado.toLowerCase()}`}>
+                      ● {u.estado}
+                    </span>
+                  </td>
+                  <td className="muted">
+                    {u.ultimoAcceso
+                      ? new Date(u.ultimoAcceso).toLocaleString('es-DO')
+                      : 'Nunca'}
+                  </td>
+                  <td>
+                    <div className="user-actions">
+                      <button onClick={() => open('edit', u)}>Editar</button>
+                      <button onClick={() => open('password', u)}>Clave</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {modal && (
+        <div className="modal-backdrop" onMouseDown={() => setModal(null)}>
+          <form
+            className="user-modal"
+            onSubmit={submit}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <span>
+                  {modal === 'new'
+                    ? 'NUEVA CUENTA'
+                    : modal === 'edit'
+                      ? 'PERMISOS Y ESTADO'
+                      : 'SEGURIDAD'}
+                </span>
+                <h2>
+                  {modal === 'new'
+                    ? 'Crear usuario'
+                    : modal === 'edit'
+                      ? selected!.nombre
+                      : 'Restablecer contraseña'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="close-button"
+                onClick={() => setModal(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            {modal === 'password' ? (
+              <>
+                <p className="form-help">
+                  La persona deberá utilizar esta nueva contraseña en su próximo acceso.
+                </p>
+                <label>
+                  Nueva contraseña
+                  <input
+                    name="clave"
+                    type="password"
+                    minLength={10}
+                    autoComplete="new-password"
+                    placeholder="Mínimo 10 caracteres"
+                    required
+                    autoFocus
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <label>
+                  Nombre completo
+                  <input
+                    name="nombre"
+                    defaultValue={selected?.nombre}
+                    maxLength={80}
+                    required
+                    autoFocus
+                  />
+                </label>
+
+                {modal === 'new' && (
+                  <label>
+                    Nombre de usuario
+                    <input
+                      name="usuario"
+                      maxLength={40}
+                      autoComplete="off"
+                      required
+                    />
+                  </label>
+                )}
+
+                <label>
+                  Rol
+                  <select name="rol" defaultValue={selected?.rol ?? 'COBRADOR'}>
+                    <option value="ADMIN">Administrador</option>
+                    <option value="COBRADOR">Cobrador</option>
+                    <option value="CONSULTA">Solo consulta</option>
+                  </select>
+                </label>
+
+                {modal === 'new' ? (
+                  <label>
+                    Contraseña inicial
+                    <input
+                      name="clave"
+                      type="password"
+                      minLength={10}
+                      autoComplete="new-password"
+                      placeholder="Mínimo 10 caracteres"
+                      required
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    Estado
+                    <select name="estado" defaultValue={selected?.estado}>
+                      <option value="ACTIVO">Activo</option>
+                      <option value="INACTIVO">Inactivo</option>
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() => setModal(null)}
+              >
+                Cancelar
+              </button>
+              <button disabled={saving}>
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </section>
+  )
+}
