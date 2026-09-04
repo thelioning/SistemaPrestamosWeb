@@ -9,9 +9,13 @@ frontend/dist/
 scripts/*.dump
 scripts/backups/
 scripts/logs/
-scripts/build-check/
+scripts/build-check-*/
 scripts/LoanProbe/bin/
 scripts/LoanProbe/obj/
 scripts/ReceiptProbe/bin/
 scripts/ReceiptProbe/obj/
 backend/SistemaPrestamos.Api/storage/
+
+# Artefactos generados y temporales
+output/
+tmp/
