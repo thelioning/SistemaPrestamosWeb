@@ -31,6 +31,7 @@
   gap: 5px;
   padding-right: 20px;
   border-right: 1px solid #edf0ee;
+  min-width: 0;
 }
 .loan-overview span {
   font-size: 0.75rem;
@@ -38,6 +39,7 @@
 }
 .loan-overview strong {
   font-size: 1.25rem;
+  overflow-wrap: anywhere;
 }
 .loan-overview button {
   white-space: nowrap;
@@ -47,17 +49,20 @@
   border: 1px solid #e5e9e7;
   border-radius: 16px;
   overflow: hidden;
+  min-width: 0;
 }
 .loan-filters {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 18px 22px;
   border-bottom: 1px solid #edf0ee;
 }
 .filter-group {
   display: flex;
   gap: 9px;
+  min-width: 0;
 }
 select {
   min-width: 0;
@@ -84,7 +89,9 @@ select {
 .loan-client {
   display: grid;
   gap: 3px;
+  min-width: 0;
 }
+.loan-client b,.loan-client small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .loan-client small {
   font-size: 0.7rem;
   color: #929d97;
@@ -133,11 +140,12 @@ select {
   font-size: 0.76rem;
 }
 .empty-loans {
-  padding: 55px;
+  padding: 55px 20px;
   display: grid;
   place-items: center;
   gap: 7px;
   color: #839088;
+  text-align:center;
 }
 .empty-loans b {
   color: #35423b;
@@ -158,6 +166,7 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.loan-type-switch.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .loan-type-switch button {
   display: grid;
   text-align: left;
@@ -166,6 +175,7 @@ select {
   color: #536159;
   border: 1px solid #e5e9e7;
   padding: 14px;
+  min-width:0;
 }
 .loan-type-switch button span {
   font-size: 0.73rem;
@@ -187,6 +197,7 @@ select {
   gap: 7px;
   font-size: 0.82rem;
   font-weight: 650;
+  min-width:0;
 }
 .loan-form-grid .full {
   grid-column: 1/-1;
@@ -224,7 +235,7 @@ select {
   position: fixed;
   inset: 0;
   background: #17241f55;
-  z-index: 30;
+  z-index: 60;
   display: flex;
   justify-content: flex-end;
 }
@@ -241,6 +252,7 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap:12px;
 }
 .drawer-head span {
   font-size: 0.7rem;
@@ -256,6 +268,7 @@ select {
   display: flex;
   gap: 8px;
   margin: 18px 0;
+  flex-wrap:wrap;
 }
 .balance-card {
   background: #183f32;
@@ -272,6 +285,7 @@ select {
 }
 .balance-card strong {
   font-size: 1.75rem;
+  overflow-wrap:anywhere;
 }
 .loan-facts {
   display: grid;
@@ -284,6 +298,7 @@ select {
 .loan-facts div {
   padding: 15px;
   border-bottom: 1px solid #edf0ee;
+  min-width:0;
 }
 .loan-facts dt {
   font-size: 0.7rem;
@@ -293,6 +308,7 @@ select {
   margin: 5px 0 0;
   font-size: 0.85rem;
   font-weight: 700;
+  overflow-wrap:anywhere;
 }
 .schedule h3 {
   font-size: 1rem;
@@ -301,6 +317,7 @@ select {
 .schedule > div {
   display: flex;
   justify-content: space-between;
+  gap:12px;
   padding: 12px 2px;
   border-bottom: 1px solid #edf0ee;
 }
@@ -339,6 +356,7 @@ select {
   }
   .loan-overview > div {
     border: 0;
+    padding-right:0;
   }
   .loan-overview > div:nth-child(3) {
     display: none;
@@ -348,6 +366,7 @@ select {
     flex-direction: column;
     gap: 12px;
   }
+  .filter-group {display:grid;grid-template-columns:1fr 1fr}
   .filter-group select {
     width: 100%;
   }
@@ -369,4 +388,19 @@ select {
   .loan-facts {
     grid-template-columns: 1fr 1fr;
   }
+  .loan-type-switch.three{grid-template-columns:1fr 1fr}
+}
+@media(max-width:520px){
+  .loan-overview{grid-template-columns:1fr;padding:16px;gap:12px}
+  .loan-overview>div{display:grid!important;padding:0 0 10px;border:0;border-bottom:1px solid #edf0ee}
+  .loan-overview>div:nth-child(3){display:none!important}
+  .loan-overview button{grid-column:auto;width:100%}
+  .filter-group{grid-template-columns:1fr}
+  .loan-filters{padding:15px}
+  .loan-type-switch,.loan-type-switch.three{grid-template-columns:1fr}
+  .loan-modal{padding:18px;border-radius:14px}
+  .loan-drawer{padding:20px}
+  .loan-facts{grid-template-columns:1fr}
+  .schedule>div{font-size:.86rem}
+  .loans-table th:nth-child(4),.loans-table td:nth-child(4){display:none}
 }
