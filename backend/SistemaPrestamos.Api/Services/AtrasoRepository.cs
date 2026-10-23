@@ -27,7 +27,8 @@ public sealed class AtrasoRepository(NpgsqlDataSource source)
  ),
  redito_base AS (
    SELECT c.id_cliente,c.nombre cliente,c.telefono,p.id_prestamo,p.fecha_inicio,p.monto_redito,f.dias,
-          MAX(pg.fecha_pago) FILTER(WHERE pg.estado='APLICADO' AND tpg.nombre='REDITO') ultimo_pago
+          MAX(pg.fecha_pago) FILTER(WHERE pg.estado='APLICADO' AND tpg.nombre='REDITO') ultimo_pago,
+          COALESCE(SUM(pg.monto_pagado) FILTER(WHERE pg.estado='APLICADO' AND tpg.nombre='REDITO'),0) pagado_redito
    FROM prestamos.prestamos p
    JOIN prestamos.tipos_prestamo tp ON tp.id_tipo_prestamos=p.id_tipo_prestamos
    JOIN prestamos.estados_prestamo ep ON ep.id_estado_prestamo=p.id_estado_prestamo
@@ -40,12 +41,12 @@ public sealed class AtrasoRepository(NpgsqlDataSource source)
  ),
  redito AS (
    SELECT id_cliente,cliente,telefono,id_prestamo,
-          GREATEST(((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int,0)::bigint cuotas_vencidas,
-          GREATEST((((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int)*monto_redito,0)::numeric total_vencido,
+          CEIL(GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)/NULLIF(monto_redito,0))::bigint cuotas_vencidas,
+          GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)::numeric total_vencido,
           (COALESCE(ultimo_pago,fecha_inicio)+dias)::date primer_vencimiento,
           GREATEST((current_date-COALESCE(ultimo_pago,fecha_inicio))::int,0) dias_atraso
    FROM redito_base
-   WHERE ((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int>0
+   WHERE GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)>0
  ),
  obligaciones AS (
    SELECT * FROM san
