@@ -11,12 +11,14 @@ const money=(v=0)=>new Intl.NumberFormat('es-DO',{style:'currency',currency:'DOP
 const date=(v:string)=>new Intl.DateTimeFormat('es-DO',{dateStyle:'medium'}).format(new Date(v.includes('T')?v:`${v}T00:00:00`))
 async function req(path:string,token:string){const r=await fetch(`${API}${path}`,{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)throw new Error('No fue posible cargar la ficha del cliente.');return r.json()}
 
-export default function ClienteDetalleView({token,clienteId,onBack}:{token:string;clienteId:number;onBack:()=>void}){
+export default function ClienteDetalleView({token,clienteId,initialTab='resumen',onTabChange,onBack}:{token:string;clienteId:number;initialTab?:'resumen'|'prestamos'|'pagos'|'recibos'|'historial';onTabChange?:(tab:'resumen'|'prestamos'|'pagos'|'recibos'|'historial')=>void;onBack:()=>void}){
  const[data,setData]=useState<EstadoCuenta|null>(null)
  const[recibos,setRecibos]=useState<Recibo[]>([])
- const[tab,setTab]=useState<'resumen'|'prestamos'|'pagos'|'recibos'|'historial'>('resumen')
+ const[tab,setTab]=useState<'resumen'|'prestamos'|'pagos'|'recibos'|'historial'>(initialTab)
  const[error,setError]=useState('')
  const[opening,setOpening]=useState('')
+
+ useEffect(()=>{setTab(initialTab)},[initialTab])
 
  useEffect(()=>{
   setError('')
@@ -102,7 +104,7 @@ export default function ClienteDetalleView({token,clienteId,onBack}:{token:strin
 
   <div className="client-tabs">
    {(['resumen','prestamos','pagos','recibos','historial'] as const).map(x=>
-    <button key={x} className={tab===x?'selected':''} onClick={()=>setTab(x)}>
+    <button key={x} className={tab===x?'selected':''} onClick={()=>{setTab(x);onTabChange?.(x)}}>
      {x==='resumen'?'Resumen':x==='prestamos'?'Préstamos':x==='pagos'?'Pagos':x==='recibos'?'Recibos':'Historial'}
     </button>
    )}
