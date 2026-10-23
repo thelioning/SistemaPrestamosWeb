@@ -26,8 +26,12 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
           CASE
             WHEN v.estado NOT IN ('ACTIVO','ATRASADO') THEN 0
             WHEN v.tipo_prestamo='SAN' THEN COALESCE(s.dias,0)
-            WHEN v.tipo_prestamo='REDITO' AND current_date>COALESCE(r.ultimo_pago,p.fecha_inicio)
-              THEN (current_date-COALESCE(r.ultimo_pago,p.fecha_inicio))::int
+            WHEN v.tipo_prestamo='REDITO' AND
+                 GREATEST((GREATEST(((current_date-p.fecha_inicio)/NULLIF(f.dias,0))::int,0)*p.monto_redito)-r.pagado_redito,0)>0
+              THEN GREATEST(
+                (current_date-(p.fecha_inicio+(((FLOOR(r.pagado_redito/NULLIF(p.monto_redito,0)))::int+1)*f.dias)))::int,
+                0
+              )
             ELSE 0
           END AS dias,
           f.nombre,p.monto_redito,p.fecha_inicio,r.ultimo_pago
