@@ -5,7 +5,8 @@ public sealed record CarteraFilaDto(int PrestamoId,int ClienteId,string Cliente,
 public sealed record CarteraReporteDto(decimal TotalPrestado,decimal TotalPagado,decimal TotalBalance,decimal TotalVencido,List<CarteraFilaDto> Prestamos);
 public sealed record EstadoClienteDto(int Id,string Nombre,string? Documento,string? Telefono,string? Direccion);
 public sealed record MovimientoEstadoDto(int Id,int PrestamoId,DateOnly Fecha,string Concepto,decimal Monto,string Estado,string? Recibo,string? Observacion);
-public sealed record EstadoCuentaDto(EstadoClienteDto Cliente,decimal TotalPrestado,decimal TotalPagado,decimal Balance,List<CarteraFilaDto> Prestamos,List<MovimientoEstadoDto> Movimientos);
+public sealed record HistorialClienteDto(int Id,int PrestamoId,DateTime Fecha,string Accion,string? Descripcion);
+public sealed record EstadoCuentaDto(EstadoClienteDto Cliente,decimal TotalPrestado,decimal TotalPagado,decimal Balance,List<CarteraFilaDto> Prestamos,List<MovimientoEstadoDto> Movimientos,List<HistorialClienteDto> Historial);
 
 public sealed class ReporteRepository(NpgsqlDataSource source)
 {
@@ -18,6 +19,8 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
   await using var cc=source.CreateCommand("SELECT id_cliente,nombre,documento,telefono,direccion FROM prestamos.cliente WHERE id_cliente=$1");cc.Parameters.AddWithValue(clienteId);await using var cr=await cc.ExecuteReaderAsync();if(!await cr.ReadAsync())return null;var client=new EstadoClienteDto(cr.GetInt32(0),cr.GetString(1),cr.IsDBNull(2)?null:cr.GetString(2),cr.IsDBNull(3)?null:cr.GetString(3),cr.IsDBNull(4)?null:cr.GetString(4));await cr.DisposeAsync();
   var portfolio=await CarteraAsync();var loans=portfolio.Prestamos.Where(x=>x.ClienteId==clienteId).ToList();
   await using var pc=source.CreateCommand("""SELECT pg.id_pago,pg.id_prestamo,pg.fecha_pago,tp.nombre,pg.monto_pagado,pg.estado,r.numero_recibo,pg.observacion FROM prestamos.pagos pg JOIN prestamos.prestamos p ON p.id_prestamo=pg.id_prestamo JOIN prestamos.tipos_pago tp ON tp.id_tipo_pago=pg.id_tipo_pago LEFT JOIN prestamos.recibos_pago r ON r.id_pago=pg.id_pago WHERE p.id_cliente=$1 ORDER BY pg.fecha_pago DESC,pg.id_pago DESC""");pc.Parameters.AddWithValue(clienteId);var payments=new List<MovimientoEstadoDto>();await using var pr=await pc.ExecuteReaderAsync();while(await pr.ReadAsync())payments.Add(new(pr.GetInt32(0),pr.GetInt32(1),pr.GetFieldValue<DateOnly>(2),pr.GetString(3),pr.GetDecimal(4),pr.GetString(5),pr.IsDBNull(6)?null:pr.GetString(6),pr.IsDBNull(7)?null:pr.GetString(7)));
-  return new(client,loans.Sum(x=>x.MontoPrestado),loans.Sum(x=>x.Pagado),loans.Sum(x=>x.Balance),loans,payments);
+  await pr.DisposeAsync();
+  await using var hc=source.CreateCommand("""SELECT h.id_historial,h.id_prestamo,h.fecha,h.accion,h.descripcion FROM prestamos.historial_prestamos h JOIN prestamos.prestamos p ON p.id_prestamo=h.id_prestamo WHERE p.id_cliente=$1 ORDER BY h.fecha DESC,h.id_historial DESC""");hc.Parameters.AddWithValue(clienteId);var history=new List<HistorialClienteDto>();await using var hr=await hc.ExecuteReaderAsync();while(await hr.ReadAsync())history.Add(new(hr.GetInt32(0),hr.GetInt32(1),hr.GetDateTime(2),hr.GetString(3),hr.IsDBNull(4)?null:hr.GetString(4)));
+  return new(client,loans.Sum(x=>x.MontoPrestado),loans.Sum(x=>x.Pagado),loans.Sum(x=>x.Balance),loans,payments,history);
  }
 }
