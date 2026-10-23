@@ -20,7 +20,7 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
             WHEN v.estado NOT IN ('ACTIVO','ATRASADO') THEN 0
             WHEN v.tipo_prestamo='SAN' THEN COALESCE(s.vencido,0)
             WHEN v.tipo_prestamo='REDITO' THEN
-              GREATEST((((current_date-COALESCE(r.ultimo_pago,p.fecha_inicio))/NULLIF(f.dias,0))::int)*p.monto_redito,0)
+              GREATEST((GREATEST(((current_date-p.fecha_inicio)/NULLIF(f.dias,0))::int,0)*p.monto_redito)-r.pagado_redito,0)
             ELSE 0
           END AS vencido,
           CASE
@@ -45,7 +45,10 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
    LEFT JOIN LATERAL(
      SELECT MAX(pg.fecha_pago) FILTER(
        WHERE pg.estado='APLICADO' AND tp.nombre='REDITO'
-     ) ultimo_pago
+     ) ultimo_pago,
+     COALESCE(SUM(pg.monto_pagado) FILTER(
+       WHERE pg.estado='APLICADO' AND tp.nombre='REDITO'
+     ),0) pagado_redito
      FROM prestamos.pagos pg
      JOIN prestamos.tipos_pago tp ON tp.id_tipo_pago=pg.id_tipo_pago
      WHERE pg.id_prestamo=p.id_prestamo
