@@ -12,7 +12,41 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
 {
  public async Task<CarteraReporteDto> CarteraAsync()
  {
-  await using var c=source.CreateCommand("""SELECT v.id_prestamo,v.id_cliente,v.cliente,v.tipo_prestamo,v.estado,v.monto_prestado,CASE WHEN v.tipo_prestamo='SAN' THEN v.total_pagado_san ELSE v.total_capital_abonado END,v.saldo_pendiente,COALESCE(a.vencido,0),COALESCE(a.dias,0) FROM prestamos.vw_prestamos_general v LEFT JOIN LATERAL(SELECT SUM(pp.monto_programado-pp.monto_pagado) vencido,MAX(current_date-pp.fecha_vencimiento)::int dias FROM prestamos.plan_pagos pp WHERE pp.id_prestamo=v.id_prestamo AND pp.fecha_vencimiento<current_date AND pp.monto_pagado<pp.monto_programado)a ON true ORDER BY CASE v.estado WHEN 'ATRASADO' THEN 0 WHEN 'ACTIVO' THEN 1 ELSE 2 END,v.cliente,v.id_prestamo""");var rows=new List<CarteraFilaDto>();await using var r=await c.ExecuteReaderAsync();while(await r.ReadAsync())rows.Add(new(r.GetInt32(0),r.GetInt32(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetDecimal(5),r.GetDecimal(6),r.GetDecimal(7),r.GetDecimal(8),r.GetInt32(9)));return new(rows.Sum(x=>x.MontoPrestado),rows.Sum(x=>x.Pagado),rows.Sum(x=>x.Balance),rows.Sum(x=>x.Vencido),rows);
+  await using var c=source.CreateCommand("""
+   SELECT v.id_prestamo,v.id_cliente,v.cliente,v.tipo_prestamo,v.estado,v.monto_prestado,
+          CASE WHEN v.tipo_prestamo='SAN' THEN v.total_pagado_san ELSE v.total_capital_abonado END,
+          v.saldo_pendiente,
+          CASE
+            WHEN v.estado NOT IN ('ACTIVO','ATRASADO') THEN 0
+            WHEN v.tipo_prestamo='SAN' THEN COALESCE(s.vencido,0)
+            WHEN v.tipo_prestamo='REDITO' THEN GREATEST((r.periodos_vencidos*p.monto_redito)-r.pagado_redito,0)
+            ELSE 0
+          END AS vencido,
+          CASE
+            WHEN v.estado NOT IN ('ACTIVO','ATRASADO') THEN 0
+            WHEN v.tipo_prestamo='SAN' THEN COALESCE(s.dias,0)
+            WHEN v.tipo_prestamo='REDITO' AND (r.periodos_vencidos*p.monto_redito)-r.pagado_redito>0
+              THEN GREATEST((current_date-(p.fecha_inicio+(((FLOOR(r.pagado_redito/NULLIF(p.monto_redito,0)))::int+1)*f.dias)))::int,0)
+            ELSE 0
+          END AS dias
+   FROM prestamos.vw_prestamos_general v
+   JOIN prestamos.prestamos p ON p.id_prestamo=v.id_prestamo
+   JOIN prestamos.frecuencias_pago f ON f.id_frecuencia=p.id_frecuencia
+   LEFT JOIN LATERAL(
+     SELECT COALESCE(SUM(pp.monto_programado-pp.monto_pagado),0) vencido,
+            COALESCE(MAX(current_date-pp.fecha_vencimiento),0)::int dias
+     FROM prestamos.plan_pagos pp
+     WHERE pp.id_prestamo=v.id_prestamo AND pp.fecha_vencimiento<current_date AND pp.monto_pagado<pp.monto_programado
+   ) s ON true
+   LEFT JOIN LATERAL(
+     SELECT GREATEST(((current_date-p.fecha_inicio)/NULLIF(f.dias,0))::int,0) periodos_vencidos,
+            COALESCE(SUM(dp.monto) FILTER(WHERE pg.estado='APLICADO' AND dp.concepto='REDITO'),0) pagado_redito
+     FROM prestamos.pagos pg
+     JOIN prestamos.detalle_pagos dp ON dp.id_pago=pg.id_pago
+     WHERE pg.id_prestamo=p.id_prestamo
+   ) r ON true
+   ORDER BY CASE v.estado WHEN 'ATRASADO' THEN 0 WHEN 'ACTIVO' THEN 1 ELSE 2 END,v.cliente,v.id_prestamo
+   """);var rows=new List<CarteraFilaDto>();await using var r=await c.ExecuteReaderAsync();while(await r.ReadAsync())rows.Add(new(r.GetInt32(0),r.GetInt32(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetDecimal(5),r.GetDecimal(6),r.GetDecimal(7),r.GetDecimal(8),r.GetInt32(9)));return new(rows.Sum(x=>x.MontoPrestado),rows.Sum(x=>x.Pagado),rows.Sum(x=>x.Balance),rows.Sum(x=>x.Vencido),rows);
  }
  public async Task<EstadoCuentaDto?> EstadoCuentaAsync(int clienteId)
  {
