@@ -21,6 +21,7 @@ public sealed class ReporteRepository(NpgsqlDataSource source)
   await using var pc=source.CreateCommand("""SELECT pg.id_pago,pg.id_prestamo,pg.fecha_pago,tp.nombre,pg.monto_pagado,pg.estado,r.numero_recibo,pg.observacion FROM prestamos.pagos pg JOIN prestamos.prestamos p ON p.id_prestamo=pg.id_prestamo JOIN prestamos.tipos_pago tp ON tp.id_tipo_pago=pg.id_tipo_pago LEFT JOIN prestamos.recibos_pago r ON r.id_pago=pg.id_pago WHERE p.id_cliente=$1 ORDER BY pg.fecha_pago DESC,pg.id_pago DESC""");pc.Parameters.AddWithValue(clienteId);var payments=new List<MovimientoEstadoDto>();await using var pr=await pc.ExecuteReaderAsync();while(await pr.ReadAsync())payments.Add(new(pr.GetInt32(0),pr.GetInt32(1),pr.GetFieldValue<DateOnly>(2),pr.GetString(3),pr.GetDecimal(4),pr.GetString(5),pr.IsDBNull(6)?null:pr.GetString(6),pr.IsDBNull(7)?null:pr.GetString(7)));
   await pr.DisposeAsync();
   await using var hc=source.CreateCommand("""SELECT h.id_historial,h.id_prestamo,h.fecha,h.accion,h.descripcion FROM prestamos.historial_prestamos h JOIN prestamos.prestamos p ON p.id_prestamo=h.id_prestamo WHERE p.id_cliente=$1 ORDER BY h.fecha DESC,h.id_historial DESC""");hc.Parameters.AddWithValue(clienteId);var history=new List<HistorialClienteDto>();await using var hr=await hc.ExecuteReaderAsync();while(await hr.ReadAsync())history.Add(new(hr.GetInt32(0),hr.GetInt32(1),hr.GetDateTime(2),hr.GetString(3),hr.IsDBNull(4)?null:hr.GetString(4)));
-  return new(client,loans.Sum(x=>x.MontoPrestado),loans.Sum(x=>x.Pagado),loans.Sum(x=>x.Balance),loans,payments,history);
+  var totalPagado=payments.Where(x=>x.Estado=="APLICADO").Sum(x=>x.Monto);
+  return new(client,loans.Sum(x=>x.MontoPrestado),totalPagado,loans.Sum(x=>x.Balance),loans,payments,history);
  }
 }
