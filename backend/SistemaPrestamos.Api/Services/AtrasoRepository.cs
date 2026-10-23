@@ -43,8 +43,8 @@ public sealed class AtrasoRepository(NpgsqlDataSource source)
    SELECT id_cliente,cliente,telefono,id_prestamo,
           CEIL(GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)/NULLIF(monto_redito,0))::bigint cuotas_vencidas,
           GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)::numeric total_vencido,
-          (COALESCE(ultimo_pago,fecha_inicio)+dias)::date primer_vencimiento,
-          GREATEST((current_date-COALESCE(ultimo_pago,fecha_inicio))::int,0) dias_atraso
+          (fecha_inicio+(((FLOOR(pagado_redito/NULLIF(monto_redito,0)))::int+1)*dias))::date primer_vencimiento,
+          GREATEST((current_date-(fecha_inicio+(((FLOOR(pagado_redito/NULLIF(monto_redito,0)))::int+1)*dias)))::int,0) dias_atraso
    FROM redito_base
    WHERE GREATEST((GREATEST(((current_date-fecha_inicio)/NULLIF(dias,0))::int,0)*monto_redito)-pagado_redito,0)>0
  ),
