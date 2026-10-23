@@ -27,26 +27,25 @@ public sealed class AtrasoRepository(NpgsqlDataSource source)
  ),
  redito_base AS (
    SELECT c.id_cliente,c.nombre cliente,c.telefono,p.id_prestamo,p.fecha_inicio,p.monto_redito,f.dias,
-          GREATEST(((current_date-p.fecha_inicio)/NULLIF(f.dias,0))::int,0) periodos_vencidos,
-          COALESCE(SUM(dp.monto) FILTER(WHERE pg.estado='APLICADO' AND dp.concepto='REDITO'),0) pagado_redito
+          MAX(pg.fecha_pago) FILTER(WHERE pg.estado='APLICADO' AND tpg.nombre='REDITO') ultimo_pago
    FROM prestamos.prestamos p
    JOIN prestamos.tipos_prestamo tp ON tp.id_tipo_prestamos=p.id_tipo_prestamos
    JOIN prestamos.estados_prestamo ep ON ep.id_estado_prestamo=p.id_estado_prestamo
    JOIN prestamos.frecuencias_pago f ON f.id_frecuencia=p.id_frecuencia
    JOIN prestamos.cliente c ON c.id_cliente=p.id_cliente
    LEFT JOIN prestamos.pagos pg ON pg.id_prestamo=p.id_prestamo
-   LEFT JOIN prestamos.detalle_pagos dp ON dp.id_pago=pg.id_pago
+   LEFT JOIN prestamos.tipos_pago tpg ON tpg.id_tipo_pago=pg.id_tipo_pago
    WHERE tp.nombre='REDITO' AND ep.nombre IN ('ACTIVO','ATRASADO')
    GROUP BY c.id_cliente,c.nombre,c.telefono,p.id_prestamo,p.fecha_inicio,p.monto_redito,f.dias
  ),
  redito AS (
    SELECT id_cliente,cliente,telefono,id_prestamo,
-          CEIL(GREATEST((periodos_vencidos*monto_redito)-pagado_redito,0)/NULLIF(monto_redito,0))::bigint cuotas_vencidas,
-          GREATEST((periodos_vencidos*monto_redito)-pagado_redito,0)::numeric total_vencido,
-          (fecha_inicio+(((FLOOR(pagado_redito/NULLIF(monto_redito,0)))::int+1)*dias))::date primer_vencimiento,
-          GREATEST((current_date-(fecha_inicio+(((FLOOR(pagado_redito/NULLIF(monto_redito,0)))::int+1)*dias)))::int,0) dias_atraso
+          GREATEST(((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int,0)::bigint cuotas_vencidas,
+          GREATEST((((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int)*monto_redito,0)::numeric total_vencido,
+          (COALESCE(ultimo_pago,fecha_inicio)+dias)::date primer_vencimiento,
+          GREATEST((current_date-COALESCE(ultimo_pago,fecha_inicio))::int,0) dias_atraso
    FROM redito_base
-   WHERE GREATEST((periodos_vencidos*monto_redito)-pagado_redito,0)>0
+   WHERE ((current_date-COALESCE(ultimo_pago,fecha_inicio))/NULLIF(dias,0))::int>0
  ),
  obligaciones AS (
    SELECT * FROM san
