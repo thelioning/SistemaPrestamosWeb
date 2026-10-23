@@ -758,3 +758,49 @@ Cuando se retome el proyecto:
 7. Actualizar este documento cuando cambie de forma significativa el estado del proyecto.
 
 Este archivo debe funcionar como **memoria técnica del proyecto y hoja de ruta**, no como documentación de usuario final.
+
+
+## Actualización 2026-10-23 — Ficha completa del cliente
+
+Estado: **completada y validada funcionalmente**.
+
+La ficha del cliente incluye:
+- datos personales;
+- total prestado;
+- total pagado;
+- saldo actual;
+- total vencido;
+- cantidad de préstamos, activos, saldados y atrasados;
+- préstamos;
+- pagos;
+- recibos PDF;
+- historial del cliente;
+- estado de cuenta PDF;
+- diseño responsive.
+
+### Regla validada para préstamos Rédito
+
+Los conceptos de capital y mora no deben mezclarse.
+
+Para un préstamo Rédito:
+- **capital pendiente** = capital que aún no ha sido abonado;
+- **réditos pagados** = suma de pagos aplicados de tipo REDITO;
+- **réditos vencidos** = réditos exigibles por los períodos ya vencidos menos los réditos pagados;
+- **primer período impago** = primer vencimiento periódico que no queda cubierto por los réditos pagados;
+- **días de atraso** = días transcurridos desde ese primer período impago;
+- **último pago Rédito** se muestra como dato informativo separado y no sustituye la fecha real de inicio de la mora.
+
+Caso validado manualmente:
+- préstamo PR-00026, El Chino;
+- inicio: 2026-07-29;
+- frecuencia: semanal, 7 días;
+- capital: RD$5,000;
+- rédito semanal: RD$500;
+- réditos pagados: RD$1,000;
+- al 2026-10-23: 12 períodos vencidos, 10 pendientes;
+- réditos vencidos: RD$5,000;
+- primer período impago: 2026-08-19;
+- atraso: 65 días;
+- capital pendiente: RD$5,000.
+
+Esta misma regla debe mantenerse en la ficha, reportes y control global de atrasos.
