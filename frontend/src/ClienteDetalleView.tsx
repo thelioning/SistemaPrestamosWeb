@@ -2,7 +2,7 @@ import{useEffect,useMemo,useState}from'react'
 import'./ClienteDetalleView.css'
 
 const API=import.meta.env.VITE_API_URL??'http://localhost:5159'
-type Prestamo={prestamoId:number;clienteId:number;cliente:string;tipo:string;estado:string;montoPrestado:number;pagado:number;balance:number;vencido:number;diasAtraso:number}
+type Prestamo={prestamoId:number;clienteId:number;cliente:string;tipo:string;estado:string;montoPrestado:number;pagado:number;balance:number;vencido:number;diasAtraso:number;frecuencia:string;montoRedito?:number;fechaInicio:string;ultimoPago?:string}
 type Movimiento={id:number;prestamoId:number;fecha:string;concepto:string;monto:number;estado:string;recibo?:string;observacion?:string}
 type Historial={id:number;prestamoId:number;fecha:string;accion:string;descripcion?:string}
 type EstadoCuenta={cliente:{id:number;nombre:string;documento?:string;telefono?:string;direccion?:string};totalPrestado:number;totalPagado:number;balance:number;prestamos:Prestamo[];movimientos:Movimiento[];historial:Historial[]}
@@ -28,13 +28,18 @@ export default function ClienteDetalleView({token,clienteId,onBack}:{token:strin
 
  const metrics=useMemo(()=>{
   const loans=data?.prestamos??[]
+  const reditos=loans.filter(x=>x.tipo==='REDITO')
+  const ultimoPagoRedito=reditos.map(x=>x.ultimoPago).filter((x):x is string=>Boolean(x)).sort().at(-1)
   return{
    total:loans.length,
    activos:loans.filter(x=>x.estado==='ACTIVO').length,
    saldados:loans.filter(x=>x.estado==='SALDADO').length,
    atrasados:loans.filter(x=>x.estado==='ATRASADO'||x.vencido>0).length,
    vencido:loans.reduce((a,x)=>a+x.vencido,0),
-   mayorAtraso:loans.reduce((a,x)=>Math.max(a,x.diasAtraso),0)
+   mayorAtraso:loans.reduce((a,x)=>Math.max(a,x.diasAtraso),0),
+   capitalRedito:reditos.reduce((a,x)=>a+x.balance,0),
+   reditoPagado:data?.movimientos.filter(x=>x.estado==='APLICADO'&&x.concepto==='REDITO').reduce((a,x)=>a+x.monto,0)??0,
+   ultimoPagoRedito
   }
  },[data])
 
@@ -113,6 +118,7 @@ export default function ClienteDetalleView({token,clienteId,onBack}:{token:strin
      <div><dt>Préstamos con atraso</dt><dd>{metrics.atrasados}</dd></div>
      <div><dt>Saldo vencido</dt><dd>{money(metrics.vencido)}</dd></div>
      <div><dt>Mayor atraso</dt><dd>{metrics.mayorAtraso} días</dd></div>
+     {metrics.capitalRedito>0&&<><div><dt>Capital pendiente Rédito</dt><dd>{money(metrics.capitalRedito)}</dd></div><div><dt>Réditos pagados</dt><dd>{money(metrics.reditoPagado)}</dd></div><div><dt>Último pago Rédito</dt><dd>{metrics.ultimoPagoRedito?date(metrics.ultimoPagoRedito):'Sin pagos'}</dd></div></>}
     </dl>
    </article>
    <article className="client-detail-card">
